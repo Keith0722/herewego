@@ -1,0 +1,102 @@
+
+.app-container {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  padding: 30px;
+  max-width: 900px;
+  margin: auto;
+  color: #b71e1e;
+}
+
+.bus-section {
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 16px;
+  padding: 25px;
+  margin-bottom: 40px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.bus-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  border-bottom: 2px solid #f0f0f0;
+  padding-bottom: 10px;
+}
+
+
+.bus-grid {
+  display: grid;
+  /* 2 seats | 30px Aisle | 2 seats */
+  grid-template-columns: repeat(2, 1fr) 30px repeat(2, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+
+/* This pushes the 3rd seat of every row to the 4th column, 
+   leaving the 3rd column empty for the aisle */
+.seat-card:nth-child(4n-1) { grid-column: 4; }
+.seat-card:nth-child(4n) { grid-column: 5; }
+
+/* Individual Seat Styling */
+.seat-card {
+  position: relative;
+}
+
+.seat-square {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 1.1rem;
+  transition: transform 0.1s, background-color 0.2s;
+  border: 2px solid transparent;
+}
+
+.seat-square:hover {
+  transform: scale(1.05);
+}
+
+
+.status-0 { background: rgb(206, 184, 184); border-color: rgb(179, 155, 155); color:  rgb(159, 145, 145); } /* Empty */
+.status-1 { background: #7cb0d5; border-color: #2196f3; color: #1976d2; } /* Selected */
+.status-2 { background: #d46c7b; border-color: #f44336; color: #c62828; } /* Booked */
+.status-3 { background: #292828; border-color: #312f2f; color: #302c2c; } /* Unavailable */
+
+/* Buttons */
+.delete-btn {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: #2c3e50;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  z-index: 2;
+}
+
+.add-btn {
+  background: #27ae60;
+  color: white;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  margin-bottom: 20px;
+  transition: background 0.3s;
+}
+
+.add-btn:hover { background: #219150; }

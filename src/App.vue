@@ -1,47 +1,33 @@
-<script setup>
-import HelloWorld from './components/HelloWorld.vue'
-import TheWelcome from './components/TheWelcome.vue'
-</script>
-
 <template>
-  <header>
-    <img alt="Vue logo" class="logo" src="./assets/logo.svg" width="125" height="125" />
+  <div class="app-container">
+    <h1>🚌 Bus Seating Manager</h1>
+    
+    <button @click="addSeat" class="add-btn">+ Add Seat</button>
 
-    <div class="wrapper">
-      <HelloWorld msg="You did it!" />
+    <div v-for="(bus, busIndex) in buses" :key="busIndex" class="bus-section">
+      <div class="bus-header">
+        <h2>Bus #{{ busIndex + 1 }}</h2>
+        <span>{{ bus.length }} / 16 Seats Filled</span>
+      </div>
+
+      <div class="bus-grid">
+        <div v-for="seat in bus" :key="seat.id" class="seat-card">
+          <div 
+            :class="['seat-square', 'status-' + seat.status]"
+            @click="toggleStatus(seat)"
+          >
+            {{ seat.number }}
+          </div>
+          <button @click="removeSeat(busIndex, seat.id)" class="delete-btn">×</button>
+        </div>
+      </div>
     </div>
-  </header>
-
-  <main>
-    <TheWelcome />
-  </main>
+  </div>
 </template>
 
-<style scoped>
-header {
-  line-height: 1.5;
-}
+<script setup>
+import { useBusBooking } from './useBusBooking';
+import './style.css';
 
-.logo {
-  display: block;
-  margin: 0 auto 2rem;
-}
-
-@media (min-width: 1024px) {
-  header {
-    display: flex;
-    place-items: center;
-    padding-right: calc(var(--section-gap) / 2);
-  }
-
-  .logo {
-    margin: 0 2rem 0 0;
-  }
-
-  header .wrapper {
-    display: flex;
-    place-items: flex-start;
-    flex-wrap: wrap;
-  }
-}
-</style>
+const { buses, toggleStatus, addSeat, removeSeat } = useBusBooking();
+</script>
