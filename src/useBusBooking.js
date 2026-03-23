@@ -3,28 +3,40 @@ import { ref } from 'vue';
 export function useBusBooking() {
   const MAX_PER_BUS = 16;
   
+  
+  const activeSeat = ref(null);
+
   const buses = ref([
     Array.from({ length: MAX_PER_BUS }, (_, i) => ({
-      id: Date.now() + i,
+      id: crypto.randomUUID(),
       number: i + 1,
-      status: 0
+      status: 0,
+      passengerName: '',   
+      passengerAge: '',    
+      passengerGender: ''  
     }))
   ]);
 
   const addSeat = () => {
-    const lastBus = buses.value[buses.value.length - 1];
+    const availableBus = buses.value.find(bus => bus.length < MAX_PER_BUS);
 
-    if (lastBus.length < MAX_PER_BUS) {
-      lastBus.push({
-        id: Date.now(),
-        number: lastBus.length + 1,
-        status: 0
+    if (availableBus) {
+      availableBus.push({
+        id: crypto.randomUUID(),
+        number: availableBus.length + 1,
+        status: 0,
+        passengerName: '',
+        passengerAge: '',
+        passengerGender: ''
       });
     } else {
       buses.value.push([{
-        id: Date.now(),
+        id: crypto.randomUUID(),
         number: 1,
-        status: 0
+        status: 0,
+        passengerName: '',
+        passengerAge: '',
+        passengerGender: ''
       }]);
     }
   };
@@ -32,7 +44,6 @@ export function useBusBooking() {
   const removeSeat = (busIndex, seatId) => {
     buses.value[busIndex] = buses.value[busIndex].filter(s => s.id !== seatId);
     
-    // Auto Re-index the numbers for this specific bus
     buses.value[busIndex].forEach((seat, index) => {
       seat.number = index + 1;
     });
@@ -42,9 +53,19 @@ export function useBusBooking() {
     }
   };
 
-  const toggleStatus = (seat) => {
-    seat.status = (seat.status + 1) % 4;
+  const removeBus = (busIndex) => {
+    buses.value.splice(busIndex, 1);
   };
 
-  return { buses, toggleStatus, addSeat, removeSeat };
+
+  const openModal = (seat) => {
+    activeSeat.value = seat;
+  };
+
+  const closeModal = () => {
+    activeSeat.value = null;
+  };
+
+
+  return { buses, addSeat, removeSeat, removeBus, activeSeat, openModal, closeModal };
 }

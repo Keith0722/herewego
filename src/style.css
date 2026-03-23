@@ -1,19 +1,37 @@
+body {
+  background-color: #f4f7f6;
+  margin: 0;
+}
 
 .app-container {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   padding: 30px;
-  max-width: 900px;
+  max-width: 1200px;
   margin: auto;
-  color: #b71e1e;
+  color: #2c3e50;
+}
+
+h1 {
+  color: #34495e;
+  margin-bottom: 20px;
+}
+
+
+.buses-wrapper {
+  display: grid;
+  
+  grid-template-columns: repeat(3, 1fr); 
+  gap: 25px;
+  margin-top: 20px;
+  align-items: start; 
 }
 
 .bus-section {
   background: #ffffff;
-  border: 1px solid #000000;
   border-radius: 16px;
   padding: 25px;
-  margin-bottom: 40px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+  border-top: 5px solid #3498db;
 }
 
 .bus-header {
@@ -21,70 +39,58 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
-  border-bottom: 2px solid #f0f0f0;
-  padding-bottom: 10px;
+  border-bottom: 2px solid #ecf0f1;
+  padding-bottom: 15px;
+}
+
+.bus-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.bus-meta {
+  display: flex;
+  align-items: center;
+  gap: 15px;
 }
 
 
 .bus-grid {
   display: grid;
-  /* 2 seats | 30px Aisle | 2 seats */
-  grid-template-columns: repeat(2, 1fr) 30px repeat(2, 1fr);
+  grid-template-columns: 1fr 1fr 40px 1fr 1fr; /* 40px Aisle */
   gap: 12px;
   align-items: center;
 }
 
-/* This pushes the 3rd seat of every row to the 4th column, 
-   leaving the 3rd column empty for the aisle */
+.seat-card { position: relative; }
+.seat-card:nth-child(4n-3) { grid-column: 1; }
+.seat-card:nth-child(4n-2) { grid-column: 2; }
 .seat-card:nth-child(4n-1) { grid-column: 4; }
-.seat-card:nth-child(4n) { grid-column: 5; }
-
-/* Individual Seat Styling */
-.seat-card {
-  position: relative;
-}
+.seat-card:nth-child(4n)   { grid-column: 5; }
 
 .seat-square {
   aspect-ratio: 1;
+  min-height: 65px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
+  border-radius: 12px;
   cursor: pointer;
-  font-weight: 600;
-  font-size: 1.1rem;
-  transition: transform 0.1s, background-color 0.2s;
-  border: 2px solid transparent;
+  font-weight: bold;
+  font-size: 1.3rem;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
 }
 
 .seat-square:hover {
-  transform: scale(1.05);
+  transform: translateY(-3px) scale(1.05);
+  box-shadow: 0 6px 12px rgba(0,0,0,0.1);
 }
 
 
-.status-0 { background: rgb(206, 184, 184); border-color: rgb(179, 155, 155); color:  rgb(159, 145, 145); } /* Empty */
-.status-1 { background: #7cb0d5; border-color: #2196f3; color: #1976d2; } /* Selected */
-.status-2 { background: #d46c7b; border-color: #f44336; color: #c62828; } /* Booked */
-.status-3 { background: #292828; border-color: #312f2f; color: #302c2c; } /* Unavailable */
-
-/* Buttons */
-.delete-btn {
-  position: absolute;
-  top: -8px;
-  right: -8px;
-  background: #2c3e50;
-  color: white;
-  border: none;
-  border-radius: 50%;
-  width: 22px;
-  height: 22px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  z-index: 2;
-}
+.status-0 { background: #ecf0f1; color: #7f8c8d; border: 2px solid #bdc3c7; } /* Available */
+.status-2 { background: #e74c3c; color: #ffffff; border: 2px solid #c0392b; } /* Booked */
+.status-3 { background: #34495e; color: #ecf0f1; border: 2px solid #2c3e50; } /* Unavailable */
 
 .add-btn {
   background: #27ae60;
@@ -95,8 +101,137 @@
   font-size: 1rem;
   font-weight: bold;
   cursor: pointer;
-  margin-bottom: 20px;
-  transition: background 0.3s;
+  box-shadow: 0 4px 6px rgba(39, 174, 96, 0.2);
+  transition: all 0.2s;
 }
 
-.add-btn:hover { background: #219150; }
+.add-btn:hover {
+  background: #219150;
+  transform: translateY(-2px);
+}
+
+.delete-btn {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: #e74c3c;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: bold;
+  z-index: 2;
+  transition: transform 0.2s;
+}
+
+.delete-btn:hover { transform: scale(1.15); background: #c0392b; }
+
+.delete-bus-btn {
+  background: #e74c3c;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  font-size: 20px;
+  font-weight: bold;
+  transition: all 0.2s;
+}
+
+.delete-bus-btn:hover { background: #c0392b; transform: scale(1.1); }
+
+
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; width: 100vw; height: 100vh;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  padding: 30px;
+  border-radius: 16px;
+  width: 90%;
+  max-width: 350px;
+  box-shadow: 0 15px 30px rgba(0,0,0,0.2);
+  animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.modal-content h3 {
+  margin-top: 0;
+  color: #2c3e50;
+  border-bottom: 2px solid #ecf0f1;
+  padding-bottom: 15px;
+  margin-bottom: 20px;
+}
+
+.form-group {
+  margin-bottom: 15px;
+  display: flex;
+  flex-direction: column;
+}
+
+.form-group label {
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-bottom: 6px;
+  color: #7f8c8d;
+}
+
+.form-group input, 
+.form-group select {
+  padding: 10px 12px;
+  border: 1px solid #bdc3c7;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: border-color 0.2s;
+}
+
+.form-group input:focus, 
+.form-group select:focus {
+  outline: none;
+  border-color: #3498db;
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+}
+
+.save-btn {
+  width: 100%;
+  background: #3498db;
+  color: white;
+  border: none;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  font-weight: bold;
+  cursor: pointer;
+  margin-top: 15px;
+  transition: background 0.2s;
+}
+
+.save-btn:hover { background: #2980b9; }
+
+@keyframes popIn {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+
+@media (max-width: 1050px) {
+  .buses-wrapper { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 700px) {
+  .buses-wrapper { grid-template-columns: 1fr; }
+}
