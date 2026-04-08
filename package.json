@@ -9,6 +9,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "dotenv": "^17.3.1",
+    "mongoose": "^9.3.2",
     "vue": "^3.5.29"
   },
   "devDependencies": {
