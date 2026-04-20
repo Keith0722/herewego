@@ -1,66 +1,145 @@
 <template>
   <div class="bus-container">
-    <h2>Select Your Seats</h2>
+    <h2>Select a Seat to Add Details</h2>
     
     <div class="bus-body">
       <div class="row-front">
         <div class="seat driver disabled">Driver</div>
-        <div class="seat guide" :class="{ selected: isSelected('guide') }" @click="toggleSeat('guide')">Guide</div>
+        <div class="seat guide" :class="seatClass('guide')" @click="openModal('guide')">Guide</div>
       </div>
 
       <div class="cabin">
         <div v-for="row in standardRows" :key="row" class="row-standard">
-          <div class="seat" :class="{ selected: isSelected(`${row}A`) }" @click="toggleSeat(`${row}A`)">{{ row }}A</div>
-          <div class="seat" :class="{ selected: isSelected(`${row}B`) }" @click="toggleSeat(`${row}B`)">{{ row }}B</div>
+          <div class="seat" :class="seatClass(`${row}A`)" @click="openModal(`${row}A`)">{{ row }}A</div>
+          <div class="seat" :class="seatClass(`${row}B`)" @click="openModal(`${row}B`)">{{ row }}B</div>
           
-          <div class="aisle"></div> <div class="seat" :class="{ selected: isSelected(`${row}C`) }" @click="toggleSeat(`${row}C`)">{{ row }}C</div>
-          <div class="seat" :class="{ selected: isSelected(`${row}D`) }" @click="toggleSeat(`${row}D`)">{{ row }}D</div>
+          <div class="aisle"></div> 
+          
+          <div class="seat" :class="seatClass(`${row}C`)" @click="openModal(`${row}C`)">{{ row }}C</div>
+          <div class="seat" :class="seatClass(`${row}D`)" @click="openModal(`${row}D`)">{{ row }}D</div>
         </div>
       </div>
 
       <div class="row-back">
         <div v-for="seatNum in 5" :key="`back-${seatNum}`" 
              class="seat" 
-             :class="{ selected: isSelected(`Back-${seatNum}`) }" 
-             @click="toggleSeat(`Back-${seatNum}`)">
+             :class="seatClass(`Back-${seatNum}`)" 
+             @click="openModal(`Back-${seatNum}`)">
           B{{ seatNum }}
         </div>
       </div>
     </div>
 
-    <div class="summary">
-      <p>Selected Seats: {{ selectedSeats.length }}</p>
-      <p v-if="selectedSeats.length > 0">{{ selectedSeats.join(', ') }}</p>
+    <div class="summary" v-if="bookedSeatsList.length > 0">
+      <p><strong>Booked Seats ({{ bookedSeatsList.length }}):</strong></p>
+      <ul style="list-style-type: none; padding: 0; margin-top: 10px;">
+        <li v-for="(info, index) in bookedSeatsList" :key="index" style="margin-bottom: 5px;">
+          ✅ {{ info }}
+        </li>
+      </ul>
+    </div>
+
+    <div v-if="activeSeat" class="modal-overlay" @click.self="closeModal">
+      <div class="modal-content">
+        <h3>Seat #{{ activeSeat.id }} Details</h3>
+        
+        <div class="form-group">
+          <label>Passenger Name</label>
+          <input type="text" v-model="activeSeat.passengerName" placeholder="Enter name..." />
+        </div>
+
+        <div class="form-group">
+          <label>Age</label>
+          <input 
+            type="number" 
+            v-model="activeSeat.passengerAge" 
+            min="0" 
+            @input="activeSeat.passengerAge = activeSeat.passengerAge < 0 ? 0 : activeSeat.passengerAge"
+            placeholder="Enter age..."/>
+        </div>
+
+        <div class="form-group">
+          <label>Gender</label>
+          <select v-model="activeSeat.passengerGender">
+            <option value="" disabled>Select...</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+
+       <div class="form-group">
+          <label>Status</label>
+          <select v-model="activeSeat.status">
+            <option :value="0">Available</option>
+            <option :value="2">Booked</option>
+            <option :value="3">Unavailable (Broken)</option>
+          </select>
+        </div>
+
+        <button @click="closeModal" class="save-btn">Save & Close</button>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 
-// Generate 8 standard rows (adjust based on bus class later)
+// We accept the tripId, but we won't use it for databases just yet
+const props = defineProps(['tripId']);
+
 const standardRows = Array.from({ length: 8 }, (_, i) => i + 1);
 
-// State to track which seats the user clicked
-const selectedSeats = ref([]);
+// This acts as our temporary "browser memory" for the seats
+const seatsData = ref({});
+const activeSeat = ref(null);
 
-// Function to handle clicking a seat
-const toggleSeat = (seatId) => {
-  const index = selectedSeats.value.indexOf(seatId);
-  if (index === -1) {
-    selectedSeats.value.push(seatId); // Select it
-  } else {
-    selectedSeats.value.splice(index, 1); // Deselect it
+const openModal = (seatId) => {
+  // If the seat hasn't been clicked yet, create a blank profile for it
+  if (!seatsData.value[seatId]) {
+    seatsData.value[seatId] = {
+      id: seatId,
+      status: 0, // 0: Available, 2: Booked, 3: Unavailable
+      passengerName: '',
+      passengerAge: null,
+      passengerGender: ''
+    };
   }
+  
+  // Set it as the active seat so the modal can see it
+  activeSeat.value = seatsData.value[seatId];
 };
 
-// Helper to check if a seat is currently selected
-const isSelected = (seatId) => {
-  return selectedSeats.value.includes(seatId);
+const closeModal = () => {
+  // QUALITY OF LIFE: If they typed a name but left the dropdown on "Available", auto-switch it to "Booked"
+  if (activeSeat.value.passengerName && activeSeat.value.status === 0) {
+    activeSeat.value.status = 2;
+  }
+  
+  // Close the modal. We are NOT trying to save to a database right now!
+  activeSeat.value = null;
 };
+
+// This function controls the CSS colors (Gray, Green, Red)
+const seatClass = (seatId) => {
+  const seat = seatsData.value[seatId];
+  if (!seat) return ''; // Default Gray
+  if (seat.status === 2) return 'booked'; // Turns Green
+  if (seat.status === 3) return 'unavailable'; // Turns Red
+  return '';
+};
+
+// Generates the text for the summary box at the bottom
+const bookedSeatsList = computed(() => {
+  return Object.values(seatsData.value)
+    .filter(seat => seat.status === 2)
+    .map(seat => `${seat.id}: ${seat.passengerName || 'Unnamed'} (${seat.passengerAge || 'N/A'} yrs)`);
+});
 </script>
 
 <style scoped>
+/* Main Layout Styles */
 .bus-container {
   display: flex;
   flex-direction: column;
@@ -72,13 +151,12 @@ const isSelected = (seatId) => {
 .bus-body {
   background-color: #f0f0f0;
   border: 4px solid #333;
-  border-radius: 20px 20px 10px 10px; /* Curves the front of the bus */
+  border-radius: 20px 20px 10px 10px;
   padding: 30px 20px;
   width: 350px;
   box-shadow: 0 10px 20px rgba(0,0,0,0.2);
 }
 
-/* Base Seat Styling */
 .seat {
   width: 45px;
   height: 45px;
@@ -99,49 +177,43 @@ const isSelected = (seatId) => {
   border-color: #4a90e2;
 }
 
-.seat.selected {
-  background-color: #4a90e2;
+/* Status Classes */
+.seat.booked {
+  background-color: #27ae60; /* Green for successfully booked */
   color: white;
-  border-color: #357abd;
+  border-color: #1e8449;
 }
 
-.seat.disabled {
-  background-color: #ffcccc;
-  border-color: #cc0000;
-  color: #cc0000;
+.seat.unavailable {
+  background-color: #e74c3c; /* Red for broken/unavailable */
+  border-color: #c0392b;
+  color: white;
   cursor: not-allowed;
 }
 
-/* 1. Cockpit */
+.seat.disabled {
+  background-color: #555;
+  border-color: #333;
+  color: #fff;
+  cursor: not-allowed;
+}
+
 .row-front {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 30px; /* Space before standard rows */
+  margin-bottom: 30px;
 }
 
-/* 2. Cabin */
 .cabin {
   display: flex;
   flex-direction: column;
-  gap: 15px; /* Space between rows */
+  gap: 15px;
   margin-bottom: 15px;
 }
 
-.row-standard {
-  display: flex;
-  justify-content: space-between;
-}
-
-.aisle {
-  width: 40px; /* Width of the walking space */
-}
-
-/* 3. Lounge */
-.row-back {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 20px; /* Extra space before the back row */
-}
+.row-standard { display: flex; justify-content: space-between; }
+.aisle { width: 40px; }
+.row-back { display: flex; justify-content: space-between; margin-top: 20px; }
 
 .summary {
   margin-top: 20px;
@@ -149,7 +221,67 @@ const isSelected = (seatId) => {
   background: #fff;
   border: 1px solid #ddd;
   border-radius: 8px;
-  text-align: center;
+  text-align: left;
   width: 350px;
 }
+
+/* MODAL STYLES */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  padding: 25px;
+  border-radius: 12px;
+  width: 320px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+}
+
+.modal-content h3 {
+  margin-top: 0;
+  border-bottom: 2px solid #f0f0f0;
+  padding-bottom: 10px;
+}
+
+.form-group {
+  margin-bottom: 15px;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+.form-group label {
+  font-size: 0.9rem;
+  font-weight: bold;
+  margin-bottom: 5px;
+  color: #333;
+}
+
+.form-group input, .form-group select {
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 1rem;
+}
+
+.save-btn {
+  width: 100%;
+  padding: 10px;
+  background-color: #4a90e2;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 1rem;
+  cursor: pointer;
+  margin-top: 10px;
+}
+
+.save-btn:hover { background-color: #357abd; }
 </style>
