@@ -3,7 +3,6 @@
     <h1>🚌 Fleet Scheduling & Booking Admin</h1>
     
     <div class="dashboard">
-      
       <div class="schedule-panel">
         <h3>📅 Schedule New Trip</h3>
         <div class="form-row">
@@ -60,7 +59,7 @@
         Managing Seats: {{ activeTrip.destination }} on {{ formatDate(activeTrip.date) }} ({{ activeTrip.shift }})
       </h2>
       
-      <BusLayout :key="activeTrip._id || activeTrip.id" />
+      <BusLayout :key="activeTrip._id || activeTrip.id" :activeTrip="activeTrip" />
     </div>
     <div v-else class="empty-state">
       <p>👈 Select a trip from the dashboard above to manage seating.</p>
@@ -95,25 +94,22 @@ const todayDate = new Date().toISOString().split('T')[0];
 
 const newTrip = ref({ destination: '', busClass: 'classB', date: todayDate, shift: 'morning' });
 
-// Start with an empty list. We will let the database fill it!
 const trips = ref([]); 
 const activeTrip = ref(null);
 
-// ==========================================
-// THE BACKEND CONNECTION
-// ==========================================
-
-// 1. Fetch real trips from MongoDB when the app starts
+// 1. PULL TRIPS FROM DATABASE ON STARTUP
 onMounted(async () => {
   try {
     const response = await fetch('http://192.168.122.128:3000/api/trips');
-    trips.value = await response.json();
+    if (response.ok) {
+      trips.value = await response.json();
+    }
   } catch (error) {
-    console.error("Failed to load fleet schedule from database:", error);
+    console.error("Failed to load trips from DB:", error);
   }
 });
 
-// 2. Save new trips permanently to MongoDB
+// 2. PUSH NEW TRIP TO DATABASE
 const scheduleTrip = async () => {
   if (!newTrip.value.destination || !newTrip.value.date) {
     alert("Please select a destination and date.");
@@ -127,18 +123,18 @@ const scheduleTrip = async () => {
       body: JSON.stringify(newTrip.value)
     });
     
-    // The backend sends back the newly saved trip (which now has a real MongoDB _id)
-    const savedTrip = await response.json();
-    
-    // Push the real database object to the screen
-    trips.value.push(savedTrip); 
-    newTrip.value.destination = ''; // Reset the dropdown
+    if (response.ok) {
+      const savedTrip = await response.json();
+      trips.value.push(savedTrip); 
+      newTrip.value.destination = ''; 
+    } else {
+      const err = await response.text();
+      alert("Server Error: " + err);
+    }
   } catch (error) {
-    console.error("Failed to schedule trip:", error);
+    alert("Network Error! Could not reach Ubuntu. Is Node running? Error: " + error.message);
   }
 };
-
-// ==========================================
 
 const selectTrip = (trip) => {
   activeTrip.value = trip;
@@ -150,15 +146,31 @@ const formatDate = (dateString) => {
   return new Date(dateString).toLocaleDateString(undefined, options);
 };
 
-// --- AI CHAT LOGIC (Disabled for now) ---
+// --- AI CHAT LOGIC ---
 const chatHistory = ref([{ role: 'ai', text: 'Hello! I am your AI assistant. How can I help you manage the fleet today?' }]);
 const userInput = ref('');
 const isTyping = ref(false);
 
 const sendMessage = async () => {
   if (!userInput.value.trim()) return;
-  chatHistory.value.push({ role: 'user', text: userInput.value });
+  const currentMessage = userInput.value;
+  chatHistory.value.push({ role: 'user', text: currentMessage });
   userInput.value = ''; 
+  isTyping.value = true;
+
+  try {
+    const response = await fetch('http://192.168.122.128:3000/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: currentMessage })
+    });
+    const data = await response.json();
+    chatHistory.value.push({ role: 'ai', text: data.reply });
+  } catch (error) {
+    chatHistory.value.push({ role: 'ai', text: 'System Error: Could not reach the AI brain.' });
+  } finally {
+    isTyping.value = false;
+  }
 };
 </script>
 

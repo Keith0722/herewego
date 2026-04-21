@@ -33,8 +33,9 @@
     <div class="summary" v-if="bookedSeatsList.length > 0">
       <p><strong>Booked Seats ({{ bookedSeatsList.length }}):</strong></p>
       <ul style="list-style-type: none; padding: 0; margin-top: 10px;">
-        <li v-for="(info, index) in bookedSeatsList" :key="index" style="margin-bottom: 5px;">
-          ✅ {{ info }}
+        <li v-for="seat in bookedSeatsList" :key="seat.id" class="summary-item">
+          <span>✅ {{ seat.text }}</span>
+          <button @click="cancelBooking(seat.id)" class="cancel-btn" title="Cancel Booking">❌</button>
         </li>
       </ul>
     </div>
@@ -84,62 +85,114 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 
-// We accept the tripId, but we won't use it for databases just yet
-const props = defineProps(['tripId']);
-
+const props = defineProps(['activeTrip']);
 const standardRows = Array.from({ length: 8 }, (_, i) => i + 1);
 
-// This acts as our temporary "browser memory" for the seats
 const seatsData = ref({});
 const activeSeat = ref(null);
 
+const loadSeats = () => {
+  if (props.activeTrip && props.activeTrip.seats) {
+    const initialData = {};
+    props.activeTrip.seats.forEach(seat => {
+      initialData[seat.id] = seat;
+    });
+    seatsData.value = initialData;
+  } else {
+    seatsData.value = {};
+  }
+};
+
+onMounted(loadSeats);
+watch(() => props.activeTrip, loadSeats, { deep: true });
+
 const openModal = (seatId) => {
-  // If the seat hasn't been clicked yet, create a blank profile for it
   if (!seatsData.value[seatId]) {
     seatsData.value[seatId] = {
       id: seatId,
-      status: 0, // 0: Available, 2: Booked, 3: Unavailable
+      status: 0, 
       passengerName: '',
       passengerAge: null,
       passengerGender: ''
     };
   }
-  
-  // Set it as the active seat so the modal can see it
   activeSeat.value = seatsData.value[seatId];
 };
 
-const closeModal = () => {
-  // QUALITY OF LIFE: If they typed a name but left the dropdown on "Available", auto-switch it to "Booked"
+const closeModal = async () => {
   if (activeSeat.value.passengerName && activeSeat.value.status === 0) {
     activeSeat.value.status = 2;
   }
   
-  // Close the modal. We are NOT trying to save to a database right now!
-  activeSeat.value = null;
+  seatsData.value = { ...seatsData.value }; 
+  activeSeat.value = null; 
+
+  try {
+    const tripId = props.activeTrip._id || props.activeTrip.id;
+    await fetch(`http://192.168.122.128:3000/api/trips/${tripId}/seats`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ seats: Object.values(seatsData.value) })
+    });
+  } catch (error) {
+    console.error("Failed to sync seats with database:", error);
+  }
 };
 
-// This function controls the CSS colors (Gray, Green, Red)
+// NEW: Instantly cancel a booking and update the database
+const cancelBooking = async (seatId) => {
+  if (confirm(`Are you sure you want to cancel the booking for Seat ${seatId}?`)) {
+    // Reset the seat to totally empty and available
+    seatsData.value[seatId] = {
+      id: seatId,
+      status: 0,
+      passengerName: '',
+      passengerAge: null,
+      passengerGender: ''
+    };
+    
+    // Force UI to redraw
+    seatsData.value = { ...seatsData.value };
+
+    // Send the cleared data to the database
+    try {
+      const tripId = props.activeTrip._id || props.activeTrip.id;
+      await fetch(`http://192.168.122.128:3000/api/trips/${tripId}/seats`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ seats: Object.values(seatsData.value) })
+      });
+    } catch (error) {
+      console.error("Failed to delete booking from database:", error);
+    }
+  }
+};
+
 const seatClass = (seatId) => {
   const seat = seatsData.value[seatId];
-  if (!seat) return ''; // Default Gray
-  if (seat.status === 2) return 'booked'; // Turns Green
-  if (seat.status === 3) return 'unavailable'; // Turns Red
+  if (!seat) return ''; 
+  if (seat.status === 2) return 'booked'; 
+  if (seat.status === 3) return 'unavailable'; 
   return '';
 };
 
-// Generates the text for the summary box at the bottom
+// UPDATED: Now includes Gender and formats data perfectly for the cancel button
 const bookedSeatsList = computed(() => {
   return Object.values(seatsData.value)
     .filter(seat => seat.status === 2)
-    .map(seat => `${seat.id}: ${seat.passengerName || 'Unnamed'} (${seat.passengerAge || 'N/A'} yrs)`);
+    .map(seat => {
+      const genderLabel = seat.passengerGender ? ` | ${seat.passengerGender}` : '';
+      return {
+        id: seat.id,
+        text: `${seat.id}: ${seat.passengerName || 'Unnamed'} (${seat.passengerAge || 'N/A'} yrs${genderLabel})`
+      };
+    });
 });
 </script>
 
 <style scoped>
-/* Main Layout Styles */
 .bus-container {
   display: flex;
   flex-direction: column;
@@ -177,15 +230,14 @@ const bookedSeatsList = computed(() => {
   border-color: #4a90e2;
 }
 
-/* Status Classes */
 .seat.booked {
-  background-color: #27ae60; /* Green for successfully booked */
+  background-color: #27ae60;
   color: white;
   border-color: #1e8449;
 }
 
 .seat.unavailable {
-  background-color: #e74c3c; /* Red for broken/unavailable */
+  background-color: #e74c3c;
   border-color: #c0392b;
   color: white;
   cursor: not-allowed;
@@ -225,7 +277,30 @@ const bookedSeatsList = computed(() => {
   width: 350px;
 }
 
-/* MODAL STYLES */
+/* NEW STYLES FOR THE CANCEL BUTTON */
+.summary-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  padding-bottom: 5px;
+  border-bottom: 1px dashed #eee;
+}
+
+.cancel-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+  opacity: 0.6;
+  transition: 0.2s;
+}
+
+.cancel-btn:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
 .modal-overlay {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
