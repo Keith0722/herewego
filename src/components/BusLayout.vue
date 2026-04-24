@@ -30,20 +30,45 @@
       </div>
     </div>
 
-    <div class="summary" v-if="bookedSeatsList.length > 0">
-      <p><strong>Booked Seats ({{ bookedSeatsList.length }}):</strong></p>
-      <ul style="list-style-type: none; padding: 0; margin-top: 10px;">
-        <li v-for="seat in bookedSeatsList" :key="seat.id" class="summary-item">
-          <span>✅ {{ seat.text }}</span>
-          <button @click="cancelBooking(seat.id)" class="cancel-btn" title="Cancel Booking">❌</button>
-        </li>
-      </ul>
+    <div class="summary" v-if="Object.keys(groupedSeats).length > 0">
+      <div class="summary-header">
+        <p><strong>Booking Manifest</strong></p>
+        <p class="revenue">Bus Total: ₱{{ totalRevenue.toFixed(2) }}</p>
+      </div>
+
+      <div class="groups-container">
+        <div v-for="(group, groupName) in groupedSeats" :key="groupName" class="group-section">
+          <div class="group-header">
+            <h4>{{ groupName === 'Individual Bookings' ? '🧑 Individual Bookings' : `👨‍👩‍👧‍👦 Group: ${groupName}` }}</h4>
+            <span class="group-total">Subtotal: ₱{{ group.total.toFixed(2) }}</span>
+          </div>
+          
+          <ul style="list-style-type: none; padding: 0; margin-top: 5px;">
+            <li v-for="seat in group.seats" :key="seat.id" class="summary-item">
+              <span class="seat-info">
+                <strong>{{ seat.id }}</strong>: {{ seat.passengerName || 'Unnamed' }} 
+                <span class="seat-meta">({{ seat.passengerAge || 'N/A' }} yrs <span v-if="seat.passengerGender">| {{ seat.passengerGender }}</span>)</span>
+              </span>
+              <div class="seat-actions">
+                <span class="seat-fare">₱{{ seat.fare ? seat.fare.toFixed(2) : '0.00' }}</span>
+                <button @click="cancelBooking(seat.id)" class="cancel-btn" title="Cancel Booking">❌</button>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
     </div>
 
     <div v-if="activeSeat" class="modal-overlay" @click.self="closeModal">
       <div class="modal-content">
         <h3>Seat #{{ activeSeat.id }} Details</h3>
         
+        <div class="form-group group-highlight">
+          <label>Group/Family Name (Optional)</label>
+          <input type="text" v-model="activeSeat.groupName" placeholder="e.g. Smith Family" />
+          <small>Leave blank for individual bookings</small>
+        </div>
+
         <div class="form-group">
           <label>Passenger Name</label>
           <input type="text" v-model="activeSeat.passengerName" placeholder="Enter name..." />
@@ -78,6 +103,12 @@
           </select>
         </div>
 
+        <div class="fare-display">
+          <span>Ticket Price: <strong>₱{{ calculatedFare.toFixed(2) }}</strong></span>
+          <span v-if="activeSeat.passengerAge >= 60" class="discount-badge senior">Senior (20% Off)</span>
+          <span v-else-if="activeSeat.passengerAge !== null && activeSeat.passengerAge <= 12" class="discount-badge child">Child (15% Off)</span>
+        </div>
+
         <button @click="closeModal" class="save-btn">Save & Close</button>
       </div>
     </div>
@@ -89,6 +120,19 @@ import { ref, computed, onMounted, watch } from 'vue';
 
 const props = defineProps(['activeTrip']);
 const standardRows = Array.from({ length: 8 }, (_, i) => i + 1);
+
+const fareMatrix = {
+  "Ilocos": { "Class A": 750, "Class B": 450 },
+  "Pampanga": { "Class A": 500, "Class B": 400 },
+  "Zambales": { "Class A": 450, "Class B": 390 },
+  "Baguio": { "Class A": 585, "Class B": 485 },
+  "Apari": { "Class A": 1300, "Class B": 975 },
+  "La Union": { "Class A": 850, "Class B": 750 },
+  "Nueva Ecija": { "Class A": 900, "Class B": 875 },
+  "Tugegarao": { "Class A": 850, "Class B": 750 },
+  "Laog": { "Class A": 900, "Class B": 875 },
+  "Pangasinan": { "Class A": 250, "Class B": 700 }
+};
 
 const seatsData = ref({});
 const activeSeat = ref(null);
@@ -115,15 +159,58 @@ const openModal = (seatId) => {
       status: 0, 
       passengerName: '',
       passengerAge: null,
-      passengerGender: ''
+      passengerGender: '',
+      fare: 0,
+      groupName: '' // Add default group name
     };
   }
   activeSeat.value = seatsData.value[seatId];
 };
 
+const calculatedFare = computed(() => {
+  if (!activeSeat.value || !props.activeTrip) return 0;
+
+  const dest = props.activeTrip.destination;
+  let busClass = props.activeTrip.busClass;
+
+  // 🚨 SAFETY NET FOR OLD TRIPS 🚨
+  // If the database has the old squished names, fix them before searching!
+  if (busClass === 'classA') busClass = 'Class A';
+  if (busClass === 'classB') busClass = 'Class B';
+  if (busClass === 'classC') busClass = 'Class B'; // Fallback just in case
+
+  // THE TRAP: This prints exactly what the code is searching for
+  console.log(`Searching Fare Matrix For: [${dest}] and [${busClass}]`);
+
+  let baseFare = 0;
+  if (fareMatrix[dest] && fareMatrix[dest][busClass]) {
+    baseFare = fareMatrix[dest][busClass];
+  } else {
+    console.error("⚠️ MATRIX ERROR: Could not find that destination or class!");
+  }
+
+  // Apply the discounts
+  let fare = baseFare;
+  const age = activeSeat.value.passengerAge;
+  
+  if (age !== null && age !== '') {
+    if (age >= 60) {
+      fare = baseFare * 0.80; // 20% off for Seniors
+    } else if (age <= 12) {
+      fare = baseFare * 0.85; // 15% off for Children
+    }
+  }
+  
+  return fare;
+});
+
 const closeModal = async () => {
   if (activeSeat.value.passengerName && activeSeat.value.status === 0) {
     activeSeat.value.status = 2;
+  }
+  
+  if (activeSeat.value.status === 2) {
+    activeSeat.value.fare = calculatedFare.value;
   }
   
   seatsData.value = { ...seatsData.value }; 
@@ -131,35 +218,38 @@ const closeModal = async () => {
 
   try {
     const tripId = props.activeTrip._id || props.activeTrip.id;
-    await fetch(`http://192.168.122.128:3000/api/trips/${tripId}/seats`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ seats: Object.values(seatsData.value) })
+    
+    // ADD THIS TRAP RIGHT HERE:
+    console.log("THE ID I AM SENDING IS:", tripId);
+    console.log("THE FULL URL IS:", `http://192.168.122.129:3000/api/trips/${tripId}/seats`);
+
+    await fetch(`http://192.168.122.129:3000/api/trips/${tripId}/seats`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ seats: Object.values(seatsData.value) })
     });
-  } catch (error) {
+} catch (error) {
     console.error("Failed to sync seats with database:", error);
-  }
+}
 };
 
-// NEW: Instantly cancel a booking and update the database
 const cancelBooking = async (seatId) => {
   if (confirm(`Are you sure you want to cancel the booking for Seat ${seatId}?`)) {
-    // Reset the seat to totally empty and available
     seatsData.value[seatId] = {
       id: seatId,
       status: 0,
       passengerName: '',
       passengerAge: null,
-      passengerGender: ''
+      passengerGender: '',
+      fare: 0,
+      groupName: ''
     };
     
-    // Force UI to redraw
     seatsData.value = { ...seatsData.value };
 
-    // Send the cleared data to the database
     try {
       const tripId = props.activeTrip._id || props.activeTrip.id;
-      await fetch(`http://192.168.122.128:3000/api/trips/${tripId}/seats`, {
+      await fetch(`http://192.168.122.129:3000/api/trips/${tripId}/seats`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ seats: Object.values(seatsData.value) })
@@ -178,185 +268,80 @@ const seatClass = (seatId) => {
   return '';
 };
 
-// UPDATED: Now includes Gender and formats data perfectly for the cancel button
-const bookedSeatsList = computed(() => {
+const totalRevenue = computed(() => {
   return Object.values(seatsData.value)
     .filter(seat => seat.status === 2)
-    .map(seat => {
-      const genderLabel = seat.passengerGender ? ` | ${seat.passengerGender}` : '';
-      return {
-        id: seat.id,
-        text: `${seat.id}: ${seat.passengerName || 'Unnamed'} (${seat.passengerAge || 'N/A'} yrs${genderLabel})`
-      };
+    .reduce((sum, seat) => sum + (seat.fare || 0), 0);
+});
+
+// NEW LOGIC: This sorts the seats into groups and calculates subtotals!
+const groupedSeats = computed(() => {
+  const groups = {};
+  
+  Object.values(seatsData.value)
+    .filter(seat => seat.status === 2)
+    .forEach(seat => {
+      // If no group name is provided, dump them into an 'Individual Bookings' category
+      const gName = seat.groupName ? seat.groupName.trim() : 'Individual Bookings';
+      
+      if (!groups[gName]) {
+        groups[gName] = { seats: [], total: 0 };
+      }
+      
+      groups[gName].seats.push(seat);
+      groups[gName].total += (seat.fare || 0);
     });
+    
+  return groups;
 });
 </script>
 
 <style scoped>
-.bus-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  font-family: Arial, sans-serif;
-  margin-top: 20px;
-}
-
-.bus-body {
-  background-color: #f0f0f0;
-  border: 4px solid #333;
-  border-radius: 20px 20px 10px 10px;
-  padding: 30px 20px;
-  width: 350px;
-  box-shadow: 0 10px 20px rgba(0,0,0,0.2);
-}
-
-.seat {
-  width: 45px;
-  height: 45px;
-  background-color: #ddd;
-  border: 2px solid #aaa;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
-  font-size: 0.8rem;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.seat:hover:not(.disabled) {
-  background-color: #c0d8f0;
-  border-color: #4a90e2;
-}
-
-.seat.booked {
-  background-color: #27ae60;
-  color: white;
-  border-color: #1e8449;
-}
-
-.seat.unavailable {
-  background-color: #e74c3c;
-  border-color: #c0392b;
-  color: white;
-  cursor: not-allowed;
-}
-
-.seat.disabled {
-  background-color: #555;
-  border-color: #333;
-  color: #fff;
-  cursor: not-allowed;
-}
-
-.row-front {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 30px;
-}
-
-.cabin {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-  margin-bottom: 15px;
-}
-
+.bus-container { display: flex; flex-direction: column; align-items: center; font-family: Arial, sans-serif; margin-top: 20px; }
+.bus-body { background-color: #f0f0f0; border: 4px solid #333; border-radius: 20px 20px 10px 10px; padding: 30px 20px; width: 350px; box-shadow: 0 10px 20px rgba(0,0,0,0.2); }
+.seat { width: 45px; height: 45px; background-color: #ddd; border: 2px solid #aaa; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.8rem; cursor: pointer; transition: all 0.2s ease; }
+.seat:hover:not(.disabled) { background-color: #c0d8f0; border-color: #4a90e2; }
+.seat.booked { background-color: #27ae60; color: white; border-color: #1e8449; }
+.seat.unavailable { background-color: #e74c3c; border-color: #c0392b; color: white; cursor: not-allowed; }
+.seat.disabled { background-color: #555; border-color: #333; color: #fff; cursor: not-allowed; }
+.row-front { display: flex; justify-content: space-between; margin-bottom: 30px; }
+.cabin { display: flex; flex-direction: column; gap: 15px; margin-bottom: 15px; }
 .row-standard { display: flex; justify-content: space-between; }
 .aisle { width: 40px; }
 .row-back { display: flex; justify-content: space-between; margin-top: 20px; }
 
-.summary {
-  margin-top: 20px;
-  padding: 15px;
-  background: #fff;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  text-align: left;
-  width: 350px;
-}
+/* RE-ENGINEERED SUMMARY BOX STYLES */
+.summary { margin-top: 20px; padding: 15px; background: #fff; border: 1px solid #ddd; border-radius: 8px; text-align: left; width: 350px; }
+.summary-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 15px;}
+.summary-header p { margin: 0; }
+.revenue { font-size: 1.1rem; font-weight: bold; color: #27ae60; }
 
-/* NEW STYLES FOR THE CANCEL BUTTON */
-.summary-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-  padding-bottom: 5px;
-  border-bottom: 1px dashed #eee;
-}
+.group-section { background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 6px; padding: 10px; margin-bottom: 15px; }
+.group-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #4a90e2; padding-bottom: 5px; margin-bottom: 10px; }
+.group-header h4 { margin: 0; color: #333; font-size: 0.95rem; }
+.group-total { font-weight: bold; color: #4a90e2; font-size: 0.95rem; }
 
-.cancel-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 0.9rem;
-  opacity: 0.6;
-  transition: 0.2s;
-}
+.summary-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 5px; border-bottom: 1px dashed #eee; font-size: 0.9rem; }
+.seat-meta { color: #777; font-size: 0.8rem; }
+.seat-actions { display: flex; align-items: center; gap: 10px; }
+.seat-fare { font-weight: bold; color: #555; }
+.cancel-btn { background: none; border: none; cursor: pointer; font-size: 0.8rem; opacity: 0.6; transition: 0.2s; padding: 2px; }
+.cancel-btn:hover { opacity: 1; transform: scale(1.2); }
 
-.cancel-btn:hover {
-  opacity: 1;
-  transform: scale(1.1);
-}
+.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.6); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+.modal-content { background: white; padding: 25px; border-radius: 12px; width: 320px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+.modal-content h3 { margin-top: 0; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; }
+.form-group { margin-bottom: 15px; display: flex; flex-direction: column; text-align: left; }
+.form-group label { font-size: 0.9rem; font-weight: bold; margin-bottom: 5px; color: #333; }
+.form-group input, .form-group select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; }
+.form-group small { font-size: 0.75rem; color: #888; margin-top: 3px; }
 
-.modal-overlay {
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-}
+.group-highlight { background-color: #eaf3fc; padding: 10px; border-radius: 6px; border-left: 4px solid #4a90e2; margin-bottom: 20px;}
 
-.modal-content {
-  background: white;
-  padding: 25px;
-  border-radius: 12px;
-  width: 320px;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-}
-
-.modal-content h3 {
-  margin-top: 0;
-  border-bottom: 2px solid #f0f0f0;
-  padding-bottom: 10px;
-}
-
-.form-group {
-  margin-bottom: 15px;
-  display: flex;
-  flex-direction: column;
-  text-align: left;
-}
-
-.form-group label {
-  font-size: 0.9rem;
-  font-weight: bold;
-  margin-bottom: 5px;
-  color: #333;
-}
-
-.form-group input, .form-group select {
-  padding: 8px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  font-size: 1rem;
-}
-
-.save-btn {
-  width: 100%;
-  padding: 10px;
-  background-color: #4a90e2;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-size: 1rem;
-  cursor: pointer;
-  margin-top: 10px;
-}
-
+.save-btn { width: 100%; padding: 10px; background-color: #4a90e2; color: white; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer; margin-top: 10px; }
 .save-btn:hover { background-color: #357abd; }
+.fare-display { margin: 15px 0; padding: 12px; background: #f8f9fa; border-radius: 6px; border-left: 4px solid #4a90e2; display: flex; justify-content: space-between; align-items: center; }
+.discount-badge { font-size: 0.75rem; font-weight: bold; padding: 4px 8px; border-radius: 12px; color: white; }
+.discount-badge.senior { background-color: #9b59b6; }
+.discount-badge.child { background-color: #f39c12; }
 </style>

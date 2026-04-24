@@ -12,8 +12,8 @@
           </select>
           
           <select v-model="newTrip.busClass">
+            <option value="classA">Class A</option>
             <option value="classB">Class B</option>
-            <option value="classC">Class C</option>
           </select>
         </div>
 
@@ -24,8 +24,17 @@
             <option value="night">Night Shift (09:00 PM)</option>
           </select>
         </div>
+
+        <div class="form-row">
+          <select v-model="newTrip.numberOfBuses">
+            <option :value="1">1 Bus</option>
+            <option :value="2">2 Buses</option>
+            <option :value="3">3 Buses</option>
+            <option :value="4">4 Buses (Max)</option>
+          </select>
+        </div>
         
-        <button class="add-trip-btn" @click="scheduleTrip">+ Schedule Trip</button>
+        <button class="add-trip-btn" @click="scheduleTrip">+ Schedule Trip(s)</button>
       </div>
 
       <div class="active-trips-panel">
@@ -40,8 +49,11 @@
             @click="selectTrip(trip)"
           >
             <div class="trip-header">
-              <strong>{{ trip.destination }}</strong>
-              <span class="badge">{{ trip.busClass.toUpperCase() }}</span>
+              <strong>{{ trip.destination }} (Bus {{ trip.busNumber || 1 }})</strong>
+              <div class="header-actions">
+                <span class="badge">{{ trip.busClass }}</span>
+                <button class="delete-trip-btn" @click.stop="deleteTrip(trip._id || trip.id)" title="Delete Trip">🗑️</button>
+              </div>
             </div>
             <div class="trip-details">
               <span>📅 {{ formatDate(trip.date) }}</span>
@@ -55,9 +67,9 @@
     <hr class="divider" />
 
     <div v-if="activeTrip" class="layout-section">
-      <h2 class="layout-title">
-        Managing Seats: {{ activeTrip.destination }} on {{ formatDate(activeTrip.date) }} ({{ activeTrip.shift }})
-      </h2>
+     <h2 class="layout-title">
+  Managing Seats: {{ activeTrip.destination }} - {{ activeTrip.busClass }} (Bus {{ activeTrip.busNumber || 1 }}) on {{ formatDate(activeTrip.date) }}
+</h2>
       
       <BusLayout :key="activeTrip._id || activeTrip.id" :activeTrip="activeTrip" />
     </div>
@@ -92,15 +104,14 @@ import './style.css';
 const destinations = ["Ilocos", "Pampanga", "Zambales", "Baguio", "Apari", "La Union", "Nueva Ecija", "Tugegarao", "Laog", "Pangasinan"];
 const todayDate = new Date().toISOString().split('T')[0];
 
-const newTrip = ref({ destination: '', busClass: 'classB', date: todayDate, shift: 'morning' });
+const newTrip = ref({ destination: '', busClass: 'ClassA', date: todayDate, shift: 'morning', numberOfBuses: 1 });
 
 const trips = ref([]); 
 const activeTrip = ref(null);
 
-// 1. PULL TRIPS FROM DATABASE ON STARTUP
 onMounted(async () => {
   try {
-    const response = await fetch('http://192.168.122.128:3000/api/trips');
+    const response = await fetch('http://192.168.122.129:3000/api/trips');
     if (response.ok) {
       trips.value = await response.json();
     }
@@ -109,7 +120,6 @@ onMounted(async () => {
   }
 });
 
-// 2. PUSH NEW TRIP TO DATABASE
 const scheduleTrip = async () => {
   if (!newTrip.value.destination || !newTrip.value.date) {
     alert("Please select a destination and date.");
@@ -117,16 +127,17 @@ const scheduleTrip = async () => {
   }
   
   try {
-    const response = await fetch('http://192.168.122.128:3000/api/trips', {
+    const response = await fetch('http://192.168.122.129:3000/api/trips', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newTrip.value)
     });
     
     if (response.ok) {
-      const savedTrip = await response.json();
-      trips.value.push(savedTrip); 
+      const savedTrips = await response.json();
+      trips.value.push(...savedTrips); 
       newTrip.value.destination = ''; 
+      newTrip.value.numberOfBuses = 1;
     } else {
       const err = await response.text();
       alert("Server Error: " + err);
@@ -138,6 +149,34 @@ const scheduleTrip = async () => {
 
 const selectTrip = (trip) => {
   activeTrip.value = trip;
+};
+
+// NEW: DELETE LOGIC
+const deleteTrip = async (tripId) => {
+  if (!confirm("Are you sure you want to permanently delete this trip and all its bookings?")) {
+    return;
+  }
+
+  try {
+    const response = await fetch(`http://192.168.122.129:3000/api/trips/${tripId}`, {
+      method: 'DELETE'
+    });
+
+    if (response.ok) {
+      
+      trips.value = trips.value.filter(t => (t._id || t.id) !== tripId);
+      
+      
+      if (activeTrip.value && (activeTrip.value._id === tripId || activeTrip.value.id === tripId)) {
+        activeTrip.value = null;
+      }
+    } else {
+      alert("Failed to delete trip. Server responded with an error.");
+    }
+  } catch (error) {
+    console.error("Error deleting trip:", error);
+    alert("Network Error! Could not delete the trip.");
+  }
 };
 
 const formatDate = (dateString) => {
@@ -159,13 +198,30 @@ const sendMessage = async () => {
   isTyping.value = true;
 
   try {
-    const response = await fetch('http://192.168.122.128:3000/api/chat', {
+    
+    const currentTripId = activeTrip.value ? (activeTrip.value._id || activeTrip.value.id) : null;
+
+    const response = await fetch('http://192.168.122.129:3000/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: currentMessage })
+      body: JSON.stringify({ 
+        message: currentMessage, 
+        activeTripId: currentTripId // Send the spatial context!
+      })
     });
     const data = await response.json();
     chatHistory.value.push({ role: 'ai', text: data.reply });
+
+    // 2. IF THE AI BOOKED A SEAT, INSTANTLY REFRESH THE SCREEN
+    if (data.refreshNeeded) {
+      const refreshResponse = await fetch('http://192.168.122.129:3000/api/trips');
+      if (refreshResponse.ok) {
+        trips.value = await refreshResponse.json();
+       
+        activeTrip.value = trips.value.find(t => (t._id || t.id) === currentTripId);
+      }
+    }
+
   } catch (error) {
     chatHistory.value.push({ role: 'ai', text: 'System Error: Could not reach the AI brain.' });
   } finally {
@@ -189,10 +245,14 @@ const sendMessage = async () => {
 .trip-card:hover { border-color: #4a90e2; transform: translateY(-2px); }
 .trip-card.active { border-color: #4a90e2; background-color: #eaf3fc; box-shadow: 0 4px 8px rgba(74, 144, 226, 0.2); }
 .trip-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 1.1rem; }
+.header-actions { display: flex; align-items: center; gap: 8px; }
 .badge { background: #333; color: white; font-size: 0.7rem; padding: 3px 6px; border-radius: 4px; }
+.delete-trip-btn { background: none; border: none; cursor: pointer; font-size: 1rem; opacity: 0.6; transition: 0.2s; padding: 0; }
+.delete-trip-btn:hover { opacity: 1; transform: scale(1.2); }
 .trip-details { display: flex; flex-direction: column; font-size: 0.85rem; color: #666; gap: 4px; }
 .divider { margin: 30px 0; border: none; border-top: 2px dashed #ccc; }
 .layout-section { display: flex; flex-direction: column; align-items: center; }
 .layout-title { margin-bottom: 10px; color: #2c3e50; }
 .empty-state { text-align: center; color: #7f8c8d; font-size: 1.2rem; padding: 40px; }
 </style>
+
