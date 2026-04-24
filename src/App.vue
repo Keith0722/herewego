@@ -4,38 +4,46 @@
     
     <div class="dashboard">
       <div class="schedule-panel">
-        <h3>📅 Schedule New Trip</h3>
-        <div class="form-row">
-          <select v-model="newTrip.destination">
-            <option value="" disabled>Select Destination...</option>
-            <option v-for="dest in destinations" :key="dest" :value="dest">{{ dest }}</option>
-          </select>
-          
-          <select v-model="newTrip.busClass">
-            <option value="classA">Class A</option>
-            <option value="classB">Class B</option>
-          </select>
-        </div>
+  <h3>📅 Schedule New Trip</h3>
+  
+  <div class="form-row">
+    <select v-model="newTrip.origin">
+      <option value="Cubao">Cubao, QC</option>
+      <option value="Pasay">Pasay City</option>
+      <option value="PITX">PITX, Parañaque</option>
+    </select>
 
-        <div class="form-row">
-          <input type="date" v-model="newTrip.date" :min="todayDate" />
-          <select v-model="newTrip.shift">
-            <option value="morning">Morning Shift (08:00 AM)</option>
-            <option value="night">Night Shift (09:00 PM)</option>
-          </select>
-        </div>
+    <select v-model="newTrip.destination">
+      <option value="" disabled>Select Destination...</option>
+      <option v-for="dest in destinations" :key="dest" :value="dest">{{ dest }}</option>
+    </select>
+  </div>
 
-        <div class="form-row">
-          <select v-model="newTrip.numberOfBuses">
-            <option :value="1">1 Bus</option>
-            <option :value="2">2 Buses</option>
-            <option :value="3">3 Buses</option>
-            <option :value="4">4 Buses (Max)</option>
-          </select>
-        </div>
-        
-        <button class="add-trip-btn" @click="scheduleTrip">+ Schedule Trip(s)</button>
-      </div>
+  <div class="form-row">
+    <select v-model="newTrip.busClass">
+      <option value="Class A">Class A</option>
+      <option value="Class B" v-if="newTrip.shift === 'morning'">Class B</option>
+    </select>
+    
+    <select v-model="newTrip.numberOfBuses">
+      <option :value="1">1 Bus</option>
+      <option :value="2">2 Buses</option>
+      <option :value="3">3 Buses</option>
+      <option :value="4">4 Buses (Max)</option>
+    </select>
+  </div>
+
+  <div class="form-row">
+    <input type="date" v-model="newTrip.date" :min="todayDate" />
+    
+    <select v-model="newTrip.shift">
+      <option value="morning">Morning Shift (08:00 AM)</option>
+      <option value="night" v-if="isSleeperAllowed">Night Shift (Sleeper)</option>
+    </select>
+  </div>
+  
+  <button class="add-trip-btn" @click="scheduleTrip">+ Schedule Trip(s)</button>
+</div>
 
       <div class="active-trips-panel">
         <h3>🛣️ Active Trips</h3>
@@ -49,7 +57,7 @@
             @click="selectTrip(trip)"
           >
             <div class="trip-header">
-              <strong>{{ trip.destination }} (Bus {{ trip.busNumber || 1 }})</strong>
+              <strong>🏢 {{ trip.origin || 'Cubao' }} ➔ {{ trip.destination }} (Bus {{ trip.busNumber || 1 }})</strong>
               <div class="header-actions">
                 <span class="badge">{{ trip.busClass }}</span>
                 <button class="delete-trip-btn" @click.stop="deleteTrip(trip._id || trip.id)" title="Delete Trip">🗑️</button>
@@ -68,7 +76,7 @@
 
     <div v-if="activeTrip" class="layout-section">
      <h2 class="layout-title">
-  Managing Seats: {{ activeTrip.destination }} - {{ activeTrip.busClass }} (Bus {{ activeTrip.busNumber || 1 }}) on {{ formatDate(activeTrip.date) }}
+  Managing Seats: 🏢 {{ activeTrip.origin || 'Cubao' }} ➔ {{ activeTrip.destination }} - {{ activeTrip.busClass }} (Bus {{ activeTrip.busNumber || 1 }}) on {{ activeTrip.date }}
 </h2>
       
       <BusLayout :key="activeTrip._id || activeTrip.id" :activeTrip="activeTrip" />
@@ -97,14 +105,48 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch, computed } from 'vue';
 import BusLayout from './components/BusLayout.vue';
 import './style.css'; 
 
 const destinations = ["Ilocos", "Pampanga", "Zambales", "Baguio", "Apari", "La Union", "Nueva Ecija", "Tugegarao", "Laog", "Pangasinan"];
 const todayDate = new Date().toISOString().split('T')[0];
 
-const newTrip = ref({ destination: '', busClass: 'ClassA', date: todayDate, shift: 'morning', numberOfBuses: 1 });
+const newTrip = ref({origin: 'Cubao', destination: '', busClass: 'ClassA', date: todayDate, shift: 'morning', numberOfBuses: 1 });
+
+// Base travel times from Cubao (in hours)
+const baseTravelTimes = {
+  "Pampanga": 2, "Zambales": 4, "Nueva Ecija": 3.5, "Pangasinan": 4.5,
+  "Baguio": 5, "La Union": 6, "Ilocos": 9, "Laog": 10, "Tugegarao": 11, "Apari": 13
+};
+
+// Check if the trip is long enough for a sleeper bus
+const isSleeperAllowed = computed(() => {
+  if (!newTrip.value.destination) return true; // Default to true if empty
+  
+  let hours = baseTravelTimes[newTrip.value.destination];
+  
+  // Add extra time if leaving from further south!
+  if (newTrip.value.origin === 'Pasay') hours += 1;
+  if (newTrip.value.origin === 'PITX') hours += 1.5;
+  
+  return hours >= 4; // Must be 4 hours or more!
+});
+
+// If they pick a short route, force it back to Morning shift!
+watch(isSleeperAllowed, (allowed) => {
+  if (!allowed && newTrip.value.shift === 'night') {
+    newTrip.value.shift = 'morning';
+    alert("This route is too short for a Night Sleeper bus. Switching to Morning Shift.");
+  }
+});
+
+// ADD THIS WATCHER RIGHT HERE:
+watch(() => newTrip.value.shift, (newShift) => {
+  if (newShift === 'night') {
+    newTrip.value.busClass = 'Class A'; // Instantly force it to Class A
+  }
+});
 
 const trips = ref([]); 
 const activeTrip = ref(null);
@@ -240,7 +282,13 @@ const sendMessage = async () => {
 .add-trip-btn:hover { background-color: #219653; }
 .active-trips-panel { flex: 2; background: #fff; padding: 20px; border-radius: 12px; border: 1px solid #ddd; }
 .active-trips-panel h3 { margin-top: 0; color: #333; }
-.trip-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; max-height: 200px; overflow-y: auto; }
+.trip-grid { 
+  display: grid; 
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); /* <--- Changed 200px to 300px! */
+  gap: 15px; 
+  max-height: 300px; /* <--- I also bumped this slightly so your scroll box has more breathing room */
+  overflow-y: auto; 
+}
 .trip-card { border: 2px solid #e0e0e0; border-radius: 8px; padding: 12px; cursor: pointer; transition: all 0.2s ease; background: #fafafa; }
 .trip-card:hover { border-color: #4a90e2; transform: translateY(-2px); }
 .trip-card.active { border-color: #4a90e2; background-color: #eaf3fc; box-shadow: 0 4px 8px rgba(74, 144, 226, 0.2); }

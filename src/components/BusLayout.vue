@@ -171,37 +171,57 @@ const calculatedFare = computed(() => {
   if (!activeSeat.value || !props.activeTrip) return 0;
 
   const dest = props.activeTrip.destination;
+  const shift = props.activeTrip.shift || 'morning'; // Fallback to morning just in case
+  const origin = props.activeTrip.origin || 'Cubao'; // Fallback to Cubao
   let busClass = props.activeTrip.busClass;
 
-  // 🚨 SAFETY NET FOR OLD TRIPS 🚨
-  // If the database has the old squished names, fix them before searching!
+  // Safety net for old class names
   if (busClass === 'classA') busClass = 'Class A';
   if (busClass === 'classB') busClass = 'Class B';
-  if (busClass === 'classC') busClass = 'Class B'; // Fallback just in case
+  if (busClass === 'classC') busClass = 'Class B'; 
 
-  // THE TRAP: This prints exactly what the code is searching for
-  console.log(`Searching Fare Matrix For: [${dest}] and [${busClass}]`);
+  // --- THE 3D SUPER MATRIX (Base prices from Cubao) ---
+  const superMatrix = {
+    "Pampanga":   { morning: { "Class A": 500, "Class B": 400 },   night: { "Class A": 1250 } }, 
+    "Zambales":   { morning: { "Class A": 450, "Class B": 390 },   night: { "Class A": 1200 } },
+    "Pangasinan": { morning: { "Class A": 250, "Class B": 700 },   night: { "Class A": 1000 } },
+    "Baguio":     { morning: { "Class A": 585, "Class B": 485 },   night: { "Class A": 1500 } },
+    "Nueva Ecija":{ morning: { "Class A": 900, "Class B": 875 },   night: { "Class A": 1800 } },
+    "La Union":   { morning: { "Class A": 850, "Class B": 750 },   night: { "Class A": 1700 } },
+    "Ilocos":     { morning: { "Class A": 750, "Class B": 450 },   night: { "Class A": 1650 } },
+    "Laog":       { morning: { "Class A": 900, "Class B": 875 },   night: { "Class A": 1850 } },
+    "Tugegarao":  { morning: { "Class A": 850, "Class B": 750 },   night: { "Class A": 1750 } },
+    "Apari":      { morning: { "Class A": 1300, "Class B": 975 },  night: { "Class A": 2200 } }
+  };
 
+  console.log(`Calculating Fare For: [${origin}] ➔ [${dest}] | [${shift}] | [${busClass}]`);
+
+  // 1. Get the base fare from the matrix
   let baseFare = 0;
-  if (fareMatrix[dest] && fareMatrix[dest][busClass]) {
-    baseFare = fareMatrix[dest][busClass];
+  if (superMatrix[dest] && superMatrix[dest][shift] && superMatrix[dest][shift][busClass]) {
+    baseFare = superMatrix[dest][shift][busClass];
   } else {
-    console.error("⚠️ MATRIX ERROR: Could not find that destination or class!");
+    console.error("⚠️ MATRIX ERROR: Missing price for this combination!");
+    return 0;
   }
 
-  // Apply the discounts
-  let fare = baseFare;
+  // 2. Apply Origin Surcharges (Pasay +50, PITX +100)
+  if (origin === 'Pasay') baseFare += 50;
+  if (origin === 'PITX') baseFare += 100;
+
+  // 3. Apply Age Discounts
+  let finalFare = baseFare;
   const age = activeSeat.value.passengerAge;
   
   if (age !== null && age !== '') {
     if (age >= 60) {
-      fare = baseFare * 0.80; // 20% off for Seniors
+      finalFare = baseFare * 0.80; // 20% off for Seniors
     } else if (age <= 12) {
-      fare = baseFare * 0.85; // 15% off for Children
+      finalFare = baseFare * 0.85; // 15% off for Children
     }
   }
   
-  return fare;
+  return finalFare;
 });
 
 const closeModal = async () => {
