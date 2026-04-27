@@ -8,24 +8,38 @@
         <div class="seat guide" :class="seatClass('guide')" @click="openModal('guide')">Guide</div>
       </div>
 
-      <div class="cabin">
-        <div v-for="row in standardRows" :key="row" class="row-standard">
-          <div class="seat" :class="seatClass(`${row}A`)" @click="openModal(`${row}A`)">{{ row }}A</div>
-          <div class="seat" :class="seatClass(`${row}B`)" @click="openModal(`${row}B`)">{{ row }}B</div>
-          
-          <div class="aisle"></div> 
-          
-          <div class="seat" :class="seatClass(`${row}C`)" @click="openModal(`${row}C`)">{{ row }}C</div>
-          <div class="seat" :class="seatClass(`${row}D`)" @click="openModal(`${row}D`)">{{ row }}D</div>
+      <div v-if="isSleeperTrip" class="layout-wrapper">
+        <div class="cabin sleeper-cabin">
+          <div v-for="row in sleeperRows" :key="'sleeper-'+row" class="row-sleeper">
+            <div class="seat bed" :class="seatClass(`${row}A`)" @click="openModal(`${row}A`)">{{ row }}A</div>
+            <div class="sleeper-aisle"></div> 
+            <div class="seat bed" :class="seatClass(`${row}B`)" @click="openModal(`${row}B`)">{{ row }}B</div>
+            <div class="sleeper-aisle"></div> 
+            <div class="seat bed" :class="seatClass(`${row}C`)" @click="openModal(`${row}C`)">{{ row }}C</div>
+          </div>
         </div>
       </div>
 
-      <div class="row-back">
-        <div v-for="seatNum in 5" :key="`back-${seatNum}`" 
-             class="seat" 
-             :class="seatClass(`Back-${seatNum}`)" 
-             @click="openModal(`Back-${seatNum}`)">
-          B{{ seatNum }}
+      <div v-else class="layout-wrapper">
+        <div class="cabin">
+          <div v-for="row in standardRows" :key="'std-'+row" class="row-standard">
+            <div class="seat" :class="seatClass(`${row}A`)" @click="openModal(`${row}A`)">{{ row }}A</div>
+            <div class="seat" :class="seatClass(`${row}B`)" @click="openModal(`${row}B`)">{{ row }}B</div>
+            
+            <div class="aisle"></div> 
+            
+            <div class="seat" :class="seatClass(`${row}C`)" @click="openModal(`${row}C`)">{{ row }}C</div>
+            <div class="seat" :class="seatClass(`${row}D`)" @click="openModal(`${row}D`)">{{ row }}D</div>
+          </div>
+        </div>
+
+        <div class="row-back">
+          <div v-for="seatNum in 5" :key="`back-${seatNum}`" 
+               class="seat" 
+               :class="seatClass(`Back-${seatNum}`)" 
+               @click="openModal(`Back-${seatNum}`)">
+            B{{ seatNum }}
+          </div>
         </div>
       </div>
     </div>
@@ -120,22 +134,16 @@ import { ref, computed, onMounted, watch } from 'vue';
 
 const props = defineProps(['activeTrip']);
 const standardRows = Array.from({ length: 8 }, (_, i) => i + 1);
-
-const fareMatrix = {
-  "Ilocos": { "Class A": 750, "Class B": 450 },
-  "Pampanga": { "Class A": 500, "Class B": 400 },
-  "Zambales": { "Class A": 450, "Class B": 390 },
-  "Baguio": { "Class A": 585, "Class B": 485 },
-  "Apari": { "Class A": 1300, "Class B": 975 },
-  "La Union": { "Class A": 850, "Class B": 750 },
-  "Nueva Ecija": { "Class A": 900, "Class B": 875 },
-  "Tugegarao": { "Class A": 850, "Class B": 750 },
-  "Laog": { "Class A": 900, "Class B": 875 },
-  "Pangasinan": { "Class A": 250, "Class B": 700 }
-};
+const sleeperRows = Array.from({ length: 10 }, (_, i) => i + 1); 
 
 const seatsData = ref({});
 const activeSeat = ref(null);
+
+// LOGIC FIX: ONLY display the sleeper layout if it is the Night Shift
+const isSleeperTrip = computed(() => {
+  if (!props.activeTrip) return false;
+  return props.activeTrip.shift === 'night';
+});
 
 const loadSeats = () => {
   if (props.activeTrip && props.activeTrip.seats) {
@@ -161,7 +169,7 @@ const openModal = (seatId) => {
       passengerAge: null,
       passengerGender: '',
       fare: 0,
-      groupName: '' // Add default group name
+      groupName: ''
     };
   }
   activeSeat.value = seatsData.value[seatId];
@@ -171,16 +179,14 @@ const calculatedFare = computed(() => {
   if (!activeSeat.value || !props.activeTrip) return 0;
 
   const dest = props.activeTrip.destination;
-  const shift = props.activeTrip.shift || 'morning'; // Fallback to morning just in case
-  const origin = props.activeTrip.origin || 'Cubao'; // Fallback to Cubao
+  const shift = props.activeTrip.shift || 'morning'; 
+  const origin = props.activeTrip.origin || 'Cubao'; 
   let busClass = props.activeTrip.busClass;
 
-  // Safety net for old class names
   if (busClass === 'classA') busClass = 'Class A';
   if (busClass === 'classB') busClass = 'Class B';
   if (busClass === 'classC') busClass = 'Class B'; 
 
-  // --- THE 3D SUPER MATRIX (Base prices from Cubao) ---
   const superMatrix = {
     "Pampanga":   { morning: { "Class A": 500, "Class B": 400 },   night: { "Class A": 1250 } }, 
     "Zambales":   { morning: { "Class A": 450, "Class B": 390 },   night: { "Class A": 1200 } },
@@ -194,30 +200,24 @@ const calculatedFare = computed(() => {
     "Apari":      { morning: { "Class A": 1300, "Class B": 975 },  night: { "Class A": 2200 } }
   };
 
-  console.log(`Calculating Fare For: [${origin}] ➔ [${dest}] | [${shift}] | [${busClass}]`);
-
-  // 1. Get the base fare from the matrix
   let baseFare = 0;
   if (superMatrix[dest] && superMatrix[dest][shift] && superMatrix[dest][shift][busClass]) {
     baseFare = superMatrix[dest][shift][busClass];
   } else {
-    console.error("⚠️ MATRIX ERROR: Missing price for this combination!");
     return 0;
   }
 
-  // 2. Apply Origin Surcharges (Pasay +50, PITX +100)
   if (origin === 'Pasay') baseFare += 50;
   if (origin === 'PITX') baseFare += 100;
 
-  // 3. Apply Age Discounts
   let finalFare = baseFare;
   const age = activeSeat.value.passengerAge;
   
   if (age !== null && age !== '') {
     if (age >= 60) {
-      finalFare = baseFare * 0.80; // 20% off for Seniors
+      finalFare = baseFare * 0.80; 
     } else if (age <= 12) {
-      finalFare = baseFare * 0.85; // 15% off for Children
+      finalFare = baseFare * 0.85; 
     }
   }
   
@@ -238,19 +238,14 @@ const closeModal = async () => {
 
   try {
     const tripId = props.activeTrip._id || props.activeTrip.id;
-    
-    // ADD THIS TRAP RIGHT HERE:
-    console.log("THE ID I AM SENDING IS:", tripId);
-    console.log("THE FULL URL IS:", `http://192.168.122.129:3000/api/trips/${tripId}/seats`);
-
     await fetch(`http://192.168.122.129:3000/api/trips/${tripId}/seats`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ seats: Object.values(seatsData.value) })
     });
-} catch (error) {
+  } catch (error) {
     console.error("Failed to sync seats with database:", error);
-}
+  }
 };
 
 const cancelBooking = async (seatId) => {
@@ -294,14 +289,12 @@ const totalRevenue = computed(() => {
     .reduce((sum, seat) => sum + (seat.fare || 0), 0);
 });
 
-// NEW LOGIC: This sorts the seats into groups and calculates subtotals!
 const groupedSeats = computed(() => {
   const groups = {};
   
   Object.values(seatsData.value)
     .filter(seat => seat.status === 2)
     .forEach(seat => {
-      // If no group name is provided, dump them into an 'Individual Bookings' category
       const gName = seat.groupName ? seat.groupName.trim() : 'Individual Bookings';
       
       if (!groups[gName]) {
@@ -330,7 +323,24 @@ const groupedSeats = computed(() => {
 .aisle { width: 40px; }
 .row-back { display: flex; justify-content: space-between; margin-top: 20px; }
 
-/* RE-ENGINEERED SUMMARY BOX STYLES */
+/* --- CSS FOR SLEEPER PODS --- */
+.row-sleeper { display: flex; justify-content: space-between; margin-bottom: 5px; }
+.sleeper-aisle { width: 25px; } 
+.seat.bed { 
+  width: 45px; 
+  height: 65px; 
+  border-radius: 8px;
+  box-shadow: inset 0 12px 0 rgba(255, 255, 255, 0.7), 0 2px 4px rgba(0,0,0,0.1); 
+  background-color: #e2e8f0;
+  border-color: #cbd5e1;
+}
+.seat.bed.booked {
+  box-shadow: inset 0 12px 0 rgba(255, 255, 255, 0.4), 0 2px 4px rgba(0,0,0,0.1);
+  background-color: #27ae60; 
+  border-color: #1e8449;
+}
+/* -------------------------------- */
+
 .summary { margin-top: 20px; padding: 15px; background: #fff; border: 1px solid #ddd; border-radius: 8px; text-align: left; width: 350px; }
 .summary-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 15px;}
 .summary-header p { margin: 0; }
