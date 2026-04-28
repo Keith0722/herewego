@@ -1,3 +1,6 @@
+/* =========================================
+   GLOBAL RESET & LAYOUT
+========================================= */
 body {
   background-color: #f4f7f6;
   margin: 0;
@@ -16,10 +19,11 @@ h1 {
   margin-bottom: 20px;
 }
 
-
+/* =========================================
+   BUS GRID & CARDS
+========================================= */
 .buses-wrapper {
   display: grid;
-  
   grid-template-columns: repeat(3, 1fr); 
   gap: 25px;
   margin-top: 20px;
@@ -54,7 +58,6 @@ h1 {
   gap: 15px;
 }
 
-
 .bus-grid {
   display: grid;
   grid-template-columns: 1fr 1fr 40px 1fr 1fr; /* 40px Aisle */
@@ -87,11 +90,14 @@ h1 {
   box-shadow: 0 6px 12px rgba(0,0,0,0.1);
 }
 
-
+/* --- SEAT STATUS COLORS --- */
 .status-0 { background: #ecf0f1; color: #7f8c8d; border: 2px solid #bdc3c7; } /* Available */
 .status-2 { background: #e74c3c; color: #ffffff; border: 2px solid #c0392b; } /* Booked */
 .status-3 { background: #34495e; color: #ecf0f1; border: 2px solid #2c3e50; } /* Unavailable */
 
+/* =========================================
+   BUTTONS
+========================================= */
 .add-btn {
   background: #27ae60;
   color: white;
@@ -147,7 +153,9 @@ h1 {
 
 .delete-bus-btn:hover { background: #c0392b; transform: scale(1.1); }
 
-
+/* =========================================
+   MODALS
+========================================= */
 .modal-overlay {
   position: fixed;
   top: 0; left: 0; width: 100vw; height: 100vh;
@@ -227,7 +235,6 @@ h1 {
   to { opacity: 1; transform: scale(1); }
 }
 
-
 @media (max-width: 1050px) {
   .buses-wrapper { grid-template-columns: repeat(2, 1fr); }
 }
@@ -237,9 +244,8 @@ h1 {
 }
 
 /* =========================================
-   AI Chat Interface Styles
+   AI CHAT INTERFACE
 ========================================= */
-
 .ai-chat-container {
   background: #ffffff;
   border-radius: 16px;
@@ -332,11 +338,68 @@ h1 {
   transition: background 0.2s;
 }
 
-.chat-input-area button:hover:not(:disabled) {
-  background: #1a252f;
-}
+.chat-input-area button:hover:not(:disabled) { background: #1a252f; }
+.chat-input-area button:disabled { background: #95a5a6; cursor: not-allowed; }
 
-.chat-input-area button:disabled {
-  background: #95a5a6;
-  cursor: not-allowed;
+
+/* =========================================
+   DUAL-MODE PRINT MAGIC (MANIFEST & TICKETS)
+========================================= */
+@media print {
+  /* 1. Global Print Resets - Hide backgrounds & UI junk in BOTH modes */
+  body, #app, .app-container { 
+    background: white !important; 
+    color: black !important;
+  }
+  
+  /* Strictly hide everything the printer shouldn't see */
+  .ai-chat-container,
+  .buses-wrapper,
+  .schedule-panel, 
+  .bus-body, 
+  .lasso-bar, 
+  .modal-overlay, 
+  .bus-container h2,
+  .add-btn,
+  .delete-btn,
+  .delete-bus-btn { 
+    display: none !important; 
+  }
+
+  /* ------------------------------- */
+  /* MODE 1: DRIVER MANIFEST PRINT   */
+  /* ------------------------------- */
+  .print-mode-manifest .thermal-ticket-container { display: none !important; }
+  .print-mode-manifest .summary { 
+    width: 100% !important; 
+    border: none !important; 
+    box-shadow: none !important; 
+    margin: 0 !important; 
+  }
+  .print-mode-manifest .header-right, 
+  .print-mode-manifest .action-icon, 
+  .print-mode-manifest .ticket-btn { 
+    display: none !important; 
+  }
+
+  /* ------------------------------- */
+  /* MODE 2: THERMAL TICKET PRINT    */
+  /* ------------------------------- */
+  .print-mode-ticket .summary { display: none !important; }
+  .print-mode-ticket .thermal-ticket-container {
+    display: block !important;
+    width: 80mm !important; /* Perfect width for thermal printers */
+    margin: 0 auto !important;
+    font-family: 'Courier New', Courier, monospace !important;
+    color: black !important;
+    font-size: 12px !important;
+  }
+  
+  .thermal-ticket { border: 2px dashed #333; padding: 15px; }
+  .t-header, .t-footer { text-align: center; }
+  .t-header h2 { font-size: 18px; margin: 0 0 5px 0; }
+  .dash-line { border-bottom: 1px dashed #333; margin: 10px 0; }
+  .t-info p, .t-passengers p { margin: 3px 0; }
+  .t-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+  .t-total h3 { text-align: right; font-size: 16px; margin: 10px 0; }
 }

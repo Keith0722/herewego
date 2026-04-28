@@ -46,16 +46,27 @@
 </div>
 
       <div class="active-trips-panel">
-        <h3>🛣️ Active Trips</h3>
-        <div v-if="trips.length === 0" class="no-trips">No trips scheduled.</div>
+        <div class="panel-header">
+          <h3>🛣️ Active Trips</h3>
+          <div class="filter-box">
+            <span style="font-size: 0.9rem; color: #666;">Filter Date:</span>
+            <input type="date" v-model="filterDate" />
+            <button v-if="filterDate" @click="filterDate = ''" class="clear-btn">Clear</button>
+          </div>
+        </div>
+        
+        <div v-if="filteredTrips.length === 0" class="no-trips">
+          {{ filterDate ? 'No trips found for this date.' : 'No trips scheduled.' }}
+        </div>
         
         <div class="trip-grid">
           <div 
-            v-for="trip in trips" 
+            v-for="trip in filteredTrips" 
             :key="trip._id || trip.id" 
             :class="['trip-card', { active: activeTrip && (activeTrip._id === trip._id || activeTrip.id === trip.id) }]"
             @click="selectTrip(trip)"
           >
+
             <div class="trip-header">
               <strong>🏢 {{ trip.origin || 'Cubao' }} ➔ {{ trip.destination }} (Bus {{ trip.busNumber || 1 }})</strong>
               <div class="header-actions">
@@ -150,6 +161,18 @@ watch(() => newTrip.value.shift, (newShift) => {
 
 const trips = ref([]); 
 const activeTrip = ref(null);
+
+// --- NEW TIME MACHINE FILTER LOGIC ---
+const filterDate = ref(''); // Blank means "show everything"
+
+const filteredTrips = computed(() => {
+  // If the user hasn't picked a date, show all the buses
+  if (!filterDate.value) return trips.value; 
+  
+  // Otherwise, strictly filter by the exact date they picked
+  return trips.value.filter(trip => trip.date === filterDate.value);
+});
+// -------------------------------------
 
 onMounted(async () => {
   try {
@@ -282,6 +305,19 @@ const sendMessage = async () => {
 .add-trip-btn:hover { background-color: #219653; }
 .active-trips-panel { flex: 2; background: #fff; padding: 20px; border-radius: 12px; border: 1px solid #ddd; }
 .active-trips-panel h3 { margin-top: 0; color: #333; }
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  border-bottom: 2px solid #f0f0f0;
+  padding-bottom: 10px;
+}
+.panel-header h3 { margin: 0; border: none; padding: 0; }
+.filter-box { display: flex; gap: 10px; align-items: center; }
+.filter-box input { padding: 6px; border: 1px solid #ccc; border-radius: 4px; }
+.clear-btn { background: #e74c3c; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; }
+.clear-btn:hover { background: #c0392b; }
 .trip-grid { 
   display: grid; 
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); /* <--- Changed 200px to 300px! */
