@@ -346,60 +346,181 @@ h1 {
    DUAL-MODE PRINT MAGIC (MANIFEST & TICKETS)
 ========================================= */
 @media print {
-  /* 1. Global Print Resets - Hide backgrounds & UI junk in BOTH modes */
+  /* 1. Reset Page & Remove Browser Headers/Footers (localhost URL, dates, etc.) */
+  @page { margin: 0; }
+  
   body, #app, .app-container { 
     background: white !important; 
     color: black !important;
+    padding: 0 !important;
+    margin: 0 !important;
   }
   
-  /* Strictly hide everything the printer shouldn't see */
-  .ai-chat-container,
-  .buses-wrapper,
-  .schedule-panel, 
-  .bus-body, 
-  .lasso-bar, 
-  .modal-overlay, 
-  .bus-container h2,
-  .add-btn,
-  .delete-btn,
-  .delete-bus-btn { 
+  /* 2. Global Hides: Hide interactive/admin UI components *always* */
+  h1, .ai-chat-container, .modal-overlay,
+  .lasso-bar, .bus-body, .action-icon, .print-btn, .cancel-btn, .ticket-btn { 
     display: none !important; 
   }
 
   /* ------------------------------- */
   /* MODE 1: DRIVER MANIFEST PRINT   */
   /* ------------------------------- */
+  /* Hide the actual passenger thermal tickets */
   .print-mode-manifest .thermal-ticket-container { display: none !important; }
+  
+  /* Ensure parent active trips section from App.vue stays visible */
+  .print-mode-manifest .active-trips-panel,
+  .print-mode-manifest .trip-grid,
+  .print-mode-manifest .trip-card {
+    display: block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+  }
+
+  /* Stretch the manifest list summaries to full paper width */
   .print-mode-manifest .summary { 
     width: 100% !important; 
     border: none !important; 
     box-shadow: none !important; 
     margin: 0 !important; 
   }
+  
+  /* Hide manifest edit/print icons during manifest print */
   .print-mode-manifest .header-right, 
   .print-mode-manifest .action-icon, 
   .print-mode-manifest .ticket-btn { 
     display: none !important; 
   }
 
-  /* ------------------------------- */
-  /* MODE 2: THERMAL TICKET PRINT    */
-  /* ------------------------------- */
-  .print-mode-ticket .summary { display: none !important; }
-  .print-mode-ticket .thermal-ticket-container {
+ /* ======================================= */
+  /* MODE 2: THE THERMAL TICKET              */
+  /* ======================================= */
+  
+  /* 1. NUCLEAR HIDE: Make absolutely EVERYTHING on the page invisible */
+  body:has(.print-mode-ticket) * {
+    visibility: hidden !important;
+  }
+  
+  /* 2. Turn visibility back on ONLY for the ticket */
+  body:has(.print-mode-ticket) .thermal-ticket-container,
+  body:has(.print-mode-ticket) .thermal-ticket-container * {
+    visibility: visible !important;
+  }
+  
+  /* 3. Center it and protect from page breaks */
+  body:has(.print-mode-ticket) .thermal-ticket-container {
     display: block !important;
-    width: 80mm !important; /* Perfect width for thermal printers */
-    margin: 0 auto !important;
+    width: 80mm !important; 
+    margin: 0 auto !important; /* Centers the ticket perfectly */
+    padding: 15px !important;
     font-family: 'Courier New', Courier, monospace !important;
     color: black !important;
     font-size: 12px !important;
   }
-  
-  .thermal-ticket { border: 2px dashed #333; padding: 15px; }
+
+  .thermal-ticket { 
+    border: 2px dashed #333; 
+    padding: 15px; 
+    page-break-inside: avoid !important; /* Stops it from cutting in half */
+    break-inside: avoid !important;
+  }
+
   .t-header, .t-footer { text-align: center; }
-  .t-header h2 { font-size: 18px; margin: 0 0 5px 0; }
+  .t-header h2 { font-size: 18px; margin: 0 0 5px 0; display: block !important;}
   .dash-line { border-bottom: 1px dashed #333; margin: 10px 0; }
   .t-info p, .t-passengers p { margin: 3px 0; }
   .t-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
-  .t-total h3 { text-align: right; font-size: 16px; margin: 10px 0; }
+  .t-total h3 { text-align: right; font-size: 16px; margin: 10px 0; display: block !important;}
+  
+  .qr-code { 
+    display: block !important; 
+    margin: 10px auto !important; 
+    width: 120px !important; 
+    height: 120px !important; 
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+/* =========================================
+   DUAL-MODE PRINT MAGIC (MANIFEST & TICKETS)
+========================================= */
+@media print {
+  @page { margin: 0; }
+  body { background: white !important; }
+
+  /* ======================================= */
+  /* MODE 1: THE DRIVER MANIFEST             */
+  /* ======================================= */
+  body:has(.print-mode-manifest) .thermal-ticket-container,
+  body:has(.print-mode-manifest) .lasso-bar,
+  body:has(.print-mode-manifest) .bus-body,
+  body:has(.print-mode-manifest) .modal-overlay,
+  body:has(.print-mode-manifest) h2,
+  body:has(.print-mode-manifest) .action-icon,
+  body:has(.print-mode-manifest) .print-btn,
+  body:has(.print-mode-manifest) .ticket-btn,
+  body:has(.print-mode-manifest) .ai-chat-container {
+     display: none !important;
+  }
+  
+  body:has(.print-mode-manifest) .summary {
+     width: 100% !important;
+     border: none !important;
+     box-shadow: none !important;
+     margin: 0 !important;
+  }
+
+  /* ======================================= */
+  /* MODE 2: THE THERMAL TICKET              */
+  /* ======================================= */
+  
+  /* 1. Safely completely remove all main UI sections (destroys the empty ghost space) */
+  body:has(.print-mode-ticket) .dashboard,
+  body:has(.print-mode-ticket) .divider,
+  body:has(.print-mode-ticket) .layout-title,
+  body:has(.print-mode-ticket) .lasso-bar,
+  body:has(.print-mode-ticket) .bus-body,
+  body:has(.print-mode-ticket) h2,
+  body:has(.print-mode-ticket) .summary,
+  body:has(.print-mode-ticket) .ai-chat-container {
+    display: none !important;
+  }
+  
+  /* 2. Format the ticket and glue it to the Top-Center of the page */
+  body:has(.print-mode-ticket) .thermal-ticket-container {
+    display: block !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    width: 80mm !important; 
+    margin: 0 !important;
+    padding: 15px !important;
+    font-family: 'Courier New', Courier, monospace !important;
+    color: black !important;
+    font-size: 12px !important;
+  }
+
+  .thermal-ticket { 
+    border: 2px dashed #333; 
+    padding: 15px; 
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .t-header, .t-footer { text-align: center; }
+  .t-header h2 { font-size: 18px; margin: 0 0 5px 0; display: block !important;}
+  .dash-line { border-bottom: 1px dashed #333; margin: 10px 0; }
+  .t-info p, .t-passengers p { margin: 3px 0; }
+  .t-row { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 14px; }
+  .t-total h3 { text-align: right; font-size: 16px; margin: 10px 0; display: block !important;}
+  
+  .qr-code { 
+    display: block !important; 
+    margin: 10px auto !important; 
+    width: 120px !important; 
+    height: 120px !important; 
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
 }

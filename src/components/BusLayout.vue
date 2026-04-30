@@ -176,8 +176,8 @@
         </div>
 
         <div class="t-footer">
-          <img :src="`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=LOTUS-ID:${ticketData.ticketId}|Route:${activeTrip?.destination}`" alt="QR Code" class="qr-code" />
-          <p>Please present this ticket<br>or scan the QR code to board.</p>
+          <img :src="ticketData.qrLink" alt="QR Code" class="qr-code" />
+          <p>Please present this ticket<br>or scan the QR code to receive your digital copy.</p>
         </div>
       </div>
     </div>
@@ -374,11 +374,16 @@ const generateTicketId = () => {
 
 const printManifest = () => {
   printMode.value = 'manifest';
-  setTimeout(() => window.print(), 100);
+  setTimeout(() => window.print(), 800);
 };
 
 const printGroupTicket = (groupName, group) => {
   printMode.value = 'ticket';
+  
+  // Get Trip ID and use the first passenger's Seat ID for the group's digital link
+  const tripId = props.activeTrip._id || props.activeTrip.id;
+  const digitalTicketUrl = `http://192.168.122.129:3000/ticket/${tripId}/${group.seats[0].id}`;
+
   ticketData.value = { 
     isGroup: true, 
     name: groupName, 
@@ -386,13 +391,23 @@ const printGroupTicket = (groupName, group) => {
     total: group.total,
     ticketId: generateTicketId(),
     date: new Date().toLocaleDateString(),
-    time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+    time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+    // Generate the QR Link!
+    qrLink: `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(digitalTicketUrl)}`
   };
-  setTimeout(() => window.print(), 100);
+  
+  setTimeout(() => window.print(), 800);
 };
 
 const printSingleTicket = (seat) => {
   printMode.value = 'ticket';
+  
+  // 1. Get the current trip ID
+  const tripId = props.activeTrip._id || props.activeTrip.id;
+  
+  // 2. Build the exact URL the passenger's phone will open!
+  const digitalTicketUrl = `http://192.168.122.129:3000/ticket/${tripId}/${seat.id}`;
+  
   ticketData.value = { 
     isGroup: false, 
     name: seat.passengerName, 
@@ -400,9 +415,12 @@ const printSingleTicket = (seat) => {
     total: seat.fare || 0,
     ticketId: generateTicketId(),
     date: new Date().toLocaleDateString(),
-    time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+    time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+    // 3. Add the new QR Link to the ticket data
+    qrLink: `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(digitalTicketUrl)}`
   };
-  setTimeout(() => window.print(), 100);
+  
+  setTimeout(() => window.print(), 800);
 };
 </script>
 
