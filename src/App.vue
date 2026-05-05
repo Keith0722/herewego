@@ -1,5 +1,28 @@
 <template>
-  <div class="app-container">
+
+<div>
+    <!-- THE LOGIN SCREEN -->
+    <div v-if="!isLoggedIn" class="login-container">
+      <div class="login-box">
+        <h2>🚍 Lotus Transit Auth</h2>
+        <p>Restricted Admin Access</p>
+        
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" v-model="loginForm.username" @keyup.enter="handleLogin" />
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" v-model="loginForm.password" @keyup.enter="handleLogin" />
+        </div>
+        
+        <p v-if="loginError" class="error-text">{{ loginError }}</p>
+        
+        <button @click="handleLogin" class="login-btn">Secure Login</button>
+      </div>
+    </div>
+
+  <div v-else class="app-container">
     <h1>🚌 Fleet Scheduling & Booking Admin</h1>
     
     <div class="dashboard">
@@ -113,12 +136,58 @@
     </div>
 
   </div>
+  </div>
 </template>
 
 <script setup>
+
+
+
 import { ref, onMounted, watch, computed } from 'vue';
 import BusLayout from './components/BusLayout.vue';
 import './style.css'; 
+
+// --- AUTHENTICATION STATE ---
+const isLoggedIn = ref(false);
+const loginForm = ref({ username: '', password: '' });
+const loginError = ref('');
+
+// Check if we already have a digital ID card saved when the page loads
+onMounted(async () => {
+  const token = localStorage.getItem('lotus_token');
+  if (token) {
+    isLoggedIn.value = true;
+    loadTrips(); // Only load the bus data if they are logged in!
+  }
+});
+
+const handleLogin = async () => {
+  try {
+    const response = await fetch('http://192.168.122.129:3000/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(loginForm.value)
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      localStorage.setItem('lotus_token', data.token); // Save the ID card to the browser
+      isLoggedIn.value = true;
+      loginError.value = '';
+      loadTrips(); // Fetch the bus data now that the doors are open!
+    } else {
+      loginError.value = "Invalid username or password.";
+    }
+  } catch (error) {
+    loginError.value = "Backend server is offline.";
+  }
+};
+
+const handleLogout = () => {
+  localStorage.removeItem('lotus_token');
+  isLoggedIn.value = false;
+  loginForm.value = { username: '', password: '' };
+};
 
 const destinations = ["Ilocos", "Pampanga", "Zambales", "Baguio", "Apari", "La Union", "Nueva Ecija", "Tugegarao", "Laog", "Pangasinan"];
 const todayDate = new Date().toISOString().split('T')[0];
